@@ -17,7 +17,7 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from . import _version
-from .bg import remove
+from .bg import remove, clothes_seg_to_firebase
 from .session_base import BaseSession
 from .session_factory import new_session
 
@@ -441,6 +441,9 @@ def s(port: int, log_level: str, threads: int) -> None:
             media_type="image/png",
         )
 
+    def im_clothes_segregation(content: bytes) -> Response:
+        return Response(clothes_seg_to_firebase(content))
+
     @app.on_event("startup")
     def startup():
         if threads is not None:
@@ -480,5 +483,19 @@ def s(port: int, log_level: str, threads: int) -> None:
         commons: CommonQueryPostParams = Depends(),
     ):
         return await asyncify(im_without_bg)(file, commons)  # type: ignore
+
+    @app.post(
+        path="/seg_clothes",
+        tags=["segregation", "clothes"],
+        summary="Remove from filestream.",
+        description="Remove Everything but clothes.",
+    )
+    async def post_index(
+        file: bytes = File(
+            default=...,
+            description="Image file (byte stream) that has to be processed.",
+        ),
+    ):
+        return clothes_seg_to_firebase(file)
 
     uvicorn.run(app, host="0.0.0.0", port=port, log_level=log_level)

@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
+import pybase64
 from cv2 import (
     BORDER_DEFAULT,
     MORPH_ELLIPSE,
@@ -13,6 +14,7 @@ from cv2 import (
 )
 from PIL import Image
 from PIL.Image import Image as PILImage
+from pydantic import BaseModel, AnyUrl
 from pymatting.alpha.estimate_alpha_cf import estimate_alpha_cf
 from pymatting.foreground.estimate_foreground_ml import estimate_foreground_ml
 from pymatting.util.util import stack_images
@@ -111,6 +113,82 @@ def apply_background_color(img: PILImage, color: Tuple[int, int, int, int]) -> P
     colored_image.paste(img, mask=img)
 
     return colored_image
+class ClothesImage(BaseModel):
+    uri: str
+    offset_x: int
+    offset_y: int
+
+
+class SegregatedClothes(BaseModel):
+    upper_body: ClothesImage = None
+    lower_body: ClothesImage = None
+    full_body: ClothesImage = None
+
+
+def clothes_seg_to_firebase(
+    data: bytes,
+    alpha_matting: bool = True,
+    alpha_matting_foreground_threshold: int = 240,
+    alpha_matting_background_threshold: int = 10,
+    alpha_matting_erode_size: int = 10,
+    post_process_mask: bool = False,
+) -> List[ClothesImage]:
+    img = Image.open(io.BytesIO(data))
+    session = new_session("u2net_cloth_seg")
+
+    masks = session.predict(img)
+    cutouts = []
+
+    for mask in masks:
+        if post_process_mask:
+            mask = Image.fromarray(post_process(np.array(mask)))
+
+        if alpha_matting:
+            try:
+                cutout = alpha_matting_cutout(
+                    img,
+                    mask,
+                    alpha_matting_foreground_threshold,
+                    alpha_matting_background_threshold,
+                    alpha_matting_erode_size,
+                )
+            except ValueError:
+                cutout = naive_cutout(img, mask)
+
+        else:
+            cutout = naive_cutout(img, mask)
+
+        cutouts.append(cutout)
+
+    width, height = img.size
+    pixel_count = width * height
+    payload = []
+    for sample in cutouts:
+        pixels = sample.getdata(3)
+        opaque_pixels = 0
+
+        # Loop through all the pixels in the image
+        for pixel in pixels:
+            if pixel > 5:  # Check the alpha value of the pixel (0 means transparent)
+                opaque_pixels += 1
+
+        # Calculate the transparent-to-opaque pixel ratio
+        ratio = opaque_pixels / pixel_count
+        if ratio < 0.02:
+            payload.append(None)
+            continue
+
+        bbox = sample.getbbox()
+        cropped_img = sample.crop(bbox)
+
+        file_buffer = io.BytesIO()
+        cropped_img.save(file_buffer, format="WEBP", exact=True)
+        offset_x = ((bbox[2] + bbox[0]) - width) // 2
+        offset_y = ((bbox[3] + bbox[1]) - height) // 2
+        uri = pybase64.b64encode_as_string(file_buffer.getvalue())
+        payload.append(ClothesImage(uri=uri, offset_x=offset_x, offset_y=offset_y))
+
+    return payload
 
 
 def remove(
