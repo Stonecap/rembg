@@ -1,10 +1,29 @@
+import os.path
+import time
+
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import storage
 
-cred = credentials.Certificate('path/to/serviceAccountKey.json')
+key_path = os.path.join(os.getcwd(), 'wardrobeServiceAccoutKey.json')
+cred = credentials.Certificate(key_path)
 firebase_admin.initialize_app(cred, {
     'storageBucket': 'capstone-wardrobe.appspot.com'
 })
 
-bucket = storage.bucket()
+
+def upload_blob_from_memory(contents, destination_blob_name) -> str:
+    """Uploads a file to the bucket."""
+
+    # The contents to upload to the file
+    # contents = "these are my contents"
+
+    # The ID of your GCS object
+    # destination_blob_name = "storage-object-name"
+
+    bucket = storage.bucket()
+    blob = bucket.blob(destination_blob_name)
+
+    blob.upload_from_string(contents, "image/webp")
+    expire_epoch = int(time.time()) + 3600
+    return blob.generate_signed_url(expiration=expire_epoch)

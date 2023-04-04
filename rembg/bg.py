@@ -1,4 +1,5 @@
 import io
+import uuid
 from enum import Enum
 from typing import List, Optional, Tuple, Union
 
@@ -22,6 +23,8 @@ from scipy.ndimage import binary_erosion
 
 from .session_base import BaseSession
 from .session_factory import new_session
+
+from .firebase import upload_blob_from_memory
 
 kernel = getStructuringElement(MORPH_ELLIPSE, (3, 3))
 
@@ -185,7 +188,8 @@ def clothes_seg_to_firebase(
         cropped_img.save(file_buffer, format="WEBP", exact=True)
         offset_x = ((bbox[2] + bbox[0]) - width) // 2
         offset_y = ((bbox[3] + bbox[1]) - height) // 2
-        uri = pybase64.b64encode_as_string(file_buffer.getvalue())
+        blob_name = f"{uuid.uuid4()}.webp"
+        uri = upload_blob_from_memory(file_buffer.getvalue(), blob_name)
         payload.append(ClothesImage(uri=uri, offset_x=offset_x, offset_y=offset_y))
 
     return payload
