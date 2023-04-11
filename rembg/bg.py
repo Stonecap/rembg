@@ -131,7 +131,7 @@ def clothes_seg_to_firebase(
     alpha_matting: bool = True,
     alpha_matting_foreground_threshold: int = 240,
     alpha_matting_background_threshold: int = 10,
-    alpha_matting_erode_size: int = 10,
+    alpha_matting_erode_size: int = 7,
     post_process_mask: bool = False,
 ) -> List[ClothesImage]:
     img = Image.open(io.BytesIO(data))
