@@ -24,7 +24,7 @@ from .object_pool import ObjectPool
 from .session_base import BaseSession
 from .session_factory import new_session
 
-from .firebase import upload_blob_from_memory
+from .firebase import upload_blob_from_memory_task
 
 kernel = getStructuringElement(MORPH_ELLIPSE, (3, 3))
 
@@ -177,6 +177,7 @@ def clothes_seg_to_firebase(
         cutouts.append(cutout)
 
     payload = []
+    threads = []
     for sample in cutouts:
         if sample is None:
             payload.append(None)
@@ -187,12 +188,18 @@ def clothes_seg_to_firebase(
 
         file_buffer = io.BytesIO()
         cropped_img.save(file_buffer, format="WEBP", exact=True)
+
+        blob_name = f"{uuid.uuid4()}.webp"
+        uri, t = upload_blob_from_memory_task(file_buffer.getvalue(), blob_name)
+
         offset_x = ((bbox[2] + bbox[0]) - width) // 2
         offset_y = ((bbox[3] + bbox[1]) - height) // 2
-        blob_name = f"{uuid.uuid4()}.webp"
-        uri = upload_blob_from_memory(file_buffer.getvalue(), blob_name)
-        payload.append(ClothesImage(uri=uri, offset_x=offset_x, offset_y=offset_y))
 
+        payload.append(ClothesImage(uri=uri, offset_x=offset_x, offset_y=offset_y))
+        threads.append(t)
+
+    for t in threads:
+        t.join()
     return payload
 
 
