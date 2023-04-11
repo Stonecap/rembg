@@ -4,7 +4,6 @@ from enum import Enum
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-import pybase64
 from cv2 import (
     BORDER_DEFAULT,
     MORPH_ELLIPSE,
@@ -21,12 +20,15 @@ from pymatting.foreground.estimate_foreground_ml import estimate_foreground_ml
 from pymatting.util.util import stack_images
 from scipy.ndimage import binary_erosion
 
+from .object_pool import ObjectPool
 from .session_base import BaseSession
 from .session_factory import new_session
 
 from .firebase import upload_blob_from_memory
 
 kernel = getStructuringElement(MORPH_ELLIPSE, (3, 3))
+
+session_pool = ObjectPool(factory_method=new_session, param="u2net_cloth_seg", max_size=8)
 
 
 class ReturnType(Enum):
@@ -137,11 +139,15 @@ def clothes_seg_to_firebase(
     post_process_mask: bool = False,
 ) -> List[ClothesImage]:
     img = Image.open(io.BytesIO(data))
-    session = new_session("u2net_cloth_seg")
 
+    session = session_pool.acquire()
     masks = session.predict(img)
-    cutouts = []
+    session_pool.release(session)
 
+    width, height = img.size
+    pixel_count = width * height
+
+    cutouts = []
     for mask in masks:
         if post_process_mask:
             mask = Image.fromarray(post_process(np.array(mask)))
@@ -163,8 +169,6 @@ def clothes_seg_to_firebase(
 
         cutouts.append(cutout)
 
-    width, height = img.size
-    pixel_count = width * height
     payload = []
     for sample in cutouts:
         pixels = sample.getdata(3)
