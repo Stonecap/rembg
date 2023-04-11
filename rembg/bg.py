@@ -14,7 +14,7 @@ from cv2 import (
 )
 from PIL import Image
 from PIL.Image import Image as PILImage
-from pydantic import BaseModel, AnyUrl
+from pydantic import BaseModel
 from pymatting.alpha.estimate_alpha_cf import estimate_alpha_cf
 from pymatting.foreground.estimate_foreground_ml import estimate_foreground_ml
 from pymatting.util.util import stack_images
@@ -38,18 +38,12 @@ class ReturnType(Enum):
 
 
 def alpha_matting_cutout(
-    img: PILImage,
-    mask: PILImage,
+    img: np.ndarray,
+    mask: np.ndarray,
     foreground_threshold: int,
     background_threshold: int,
     erode_structure_size: int,
 ) -> PILImage:
-    if img.mode == "RGBA" or img.mode == "CMYK":
-        img = img.convert("RGB")
-
-    img = np.asarray(img)
-    mask = np.asarray(mask)
-
     is_foreground = mask > foreground_threshold
     is_background = mask < background_threshold
 
@@ -118,6 +112,8 @@ def apply_background_color(img: PILImage, color: Tuple[int, int, int, int]) -> P
     colored_image.paste(img, mask=img)
 
     return colored_image
+
+
 class ClothesImage(BaseModel):
     uri: str
     offset_x: int
@@ -139,6 +135,9 @@ def clothes_seg_to_firebase(
     post_process_mask: bool = False,
 ) -> List[ClothesImage]:
     img = Image.open(io.BytesIO(data))
+    np_img = np.array(img.convert("RGB")
+                      if img.mode == "RGBA" or img.mode == "CMYK"
+                      else img)
 
     session = session_pool.acquire()
     masks = session.predict(img)
@@ -147,16 +146,24 @@ def clothes_seg_to_firebase(
     width, height = img.size
     pixel_count = width * height
 
+    zipped = zip(masks, [np.array(x) for x in masks])
     cutouts = []
-    for mask in masks:
+
+    for mask, np_mask in zipped:
         if post_process_mask:
-            mask = Image.fromarray(post_process(np.array(mask)))
+            np_mask = post_process(np_mask)
+
+        opaque_pixels = np.count_nonzero(np_mask)
+        ratio = opaque_pixels / pixel_count
+        if ratio < 0.02:
+            cutouts.append(None)
+            continue
 
         if alpha_matting:
             try:
                 cutout = alpha_matting_cutout(
-                    img,
-                    mask,
+                    np_img,
+                    np_mask,
                     alpha_matting_foreground_threshold,
                     alpha_matting_background_threshold,
                     alpha_matting_erode_size,
@@ -171,17 +178,7 @@ def clothes_seg_to_firebase(
 
     payload = []
     for sample in cutouts:
-        pixels = sample.getdata(3)
-        opaque_pixels = 0
-
-        # Loop through all the pixels in the image
-        for pixel in pixels:
-            if pixel > 5:  # Check the alpha value of the pixel (0 means transparent)
-                opaque_pixels += 1
-
-        # Calculate the transparent-to-opaque pixel ratio
-        ratio = opaque_pixels / pixel_count
-        if ratio < 0.02:
+        if sample is None:
             payload.append(None)
             continue
 

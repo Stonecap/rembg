@@ -441,9 +441,6 @@ def s(port: int, log_level: str, threads: int) -> None:
             media_type="image/png",
         )
 
-    def im_clothes_segregation(content: bytes) -> Response:
-        return Response(clothes_seg_to_firebase(content))
-
     @app.on_event("startup")
     def startup():
         if threads is not None:
