@@ -147,7 +147,9 @@ def clothes_seg_to_firebase(
     pixel_count = width * height
 
     zipped = zip(masks, [np.array(x) for x in masks])
-    cutouts = []
+
+    payload = []
+    threads = []
 
     for mask, np_mask in zipped:
         if post_process_mask:
@@ -156,7 +158,7 @@ def clothes_seg_to_firebase(
         opaque_pixels = np.count_nonzero(np_mask)
         ratio = opaque_pixels / pixel_count
         if ratio < 0.02:
-            cutouts.append(None)
+            payload.append(None)
             continue
 
         if alpha_matting:
@@ -174,32 +176,23 @@ def clothes_seg_to_firebase(
         else:
             cutout = naive_cutout(img, mask)
 
-        cutouts.append(cutout)
-
-    payload = []
-    threads = []
-    for sample in cutouts:
-        if sample is None:
-            payload.append(None)
-            continue
-
-        bbox = sample.getbbox()
-        cropped_img = sample.crop(bbox)
+        bbox = cutout.getbbox()
+        cropped_img = cutout.crop(bbox)
 
         file_buffer = io.BytesIO()
         cropped_img.save(file_buffer, format="WEBP", exact=True)
-
         blob_name = f"{uuid.uuid4()}.webp"
+
         uri, t = upload_blob_from_memory_task(file_buffer.getvalue(), blob_name)
+        threads.append(t)
 
         offset_x = ((bbox[2] + bbox[0]) - width) // 2
         offset_y = ((bbox[3] + bbox[1]) - height) // 2
-
         payload.append(ClothesImage(uri=uri, offset_x=offset_x, offset_y=offset_y))
-        threads.append(t)
 
     for t in threads:
         t.join()
+
     return payload
 
 
