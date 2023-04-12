@@ -37,21 +37,65 @@ class ReturnType(Enum):
     NDARRAY = 2
 
 
-def alpha_matting_cutout(
+def alpha_matting_cutout_for_clothes(
     img: np.ndarray,
     mask: np.ndarray,
+    erode_structure_size: int,
+) -> PILImage:
+    is_foreground = mask.astype(bool)
+    is_background = ~mask
+
+    structure = None
+    if erode_structure_size > 0:
+        bg = erode_structure_size
+        x, y = np.meshgrid(np.arange(bg), np.arange(bg))
+        distance = np.sqrt((x - bg / 2) ** 2 + (y - bg / 2) ** 2)
+        structure = np.zeros((bg, bg), dtype=np.uint8)
+        structure[distance <= bg / 2] = 1
+
+    is_foreground = binary_erosion(is_foreground, structure=structure)
+    is_background = binary_erosion(is_background, structure=structure)
+
+    trimap = np.full(mask.shape, dtype=np.uint8, fill_value=127)
+    trimap[is_foreground] = 255
+    trimap[is_background] = 0
+
+    img_normalized = img / 255.0
+    trimap_normalized = trimap / 255.0
+
+    alpha = estimate_alpha_cf(img_normalized, trimap_normalized, laplacian_kwargs={"epsilon": 1e-5})
+    foreground = estimate_foreground_ml(img_normalized, alpha, n_big_iterations=1, n_small_iterations=2)
+    cutout = stack_images(foreground, alpha)
+
+    cutout = np.clip(cutout * 255, 0, 255).astype(np.uint8)
+    cutout = Image.fromarray(cutout)
+
+    return cutout
+
+
+def alpha_matting_cutout(
+    img: PILImage,
+    mask: PILImage,
     foreground_threshold: int,
     background_threshold: int,
     erode_structure_size: int,
 ) -> PILImage:
+    if img.mode == "RGBA" or img.mode == "CMYK":
+        img = img.convert("RGB")
+
+    img = np.asarray(img)
+    mask = np.asarray(mask)
+
     is_foreground = mask > foreground_threshold
     is_background = mask < background_threshold
 
     structure = None
     if erode_structure_size > 0:
-        structure = np.ones(
-            (erode_structure_size, erode_structure_size), dtype=np.uint8
-        )
+        bg = erode_structure_size
+        x, y = np.meshgrid(np.arange(bg), np.arange(bg))
+        distance = np.sqrt((x - bg / 2) ** 2 + (y - bg / 2) ** 2)
+        structure = np.zeros((bg, bg), dtype=np.uint8)
+        structure[distance <= bg / 2] = 1
 
     is_foreground = binary_erosion(is_foreground, structure=structure)
     is_background = binary_erosion(is_background, structure=structure, border_value=1)
@@ -129,9 +173,7 @@ class SegregatedClothes(BaseModel):
 def clothes_seg_to_firebase(
     data: bytes,
     alpha_matting: bool = True,
-    alpha_matting_foreground_threshold: int = 240,
-    alpha_matting_background_threshold: int = 10,
-    alpha_matting_erode_size: int = 7,
+    alpha_matting_erode_size: int = 12,
     post_process_mask: bool = False,
 ) -> List[ClothesImage]:
     img = Image.open(io.BytesIO(data))
@@ -163,11 +205,9 @@ def clothes_seg_to_firebase(
 
         if alpha_matting:
             try:
-                cutout = alpha_matting_cutout(
+                cutout = alpha_matting_cutout_for_clothes(
                     np_img,
                     np_mask,
-                    alpha_matting_foreground_threshold,
-                    alpha_matting_background_threshold,
                     alpha_matting_erode_size,
                 )
             except ValueError:
@@ -180,7 +220,7 @@ def clothes_seg_to_firebase(
         cropped_img = cutout.crop(bbox)
 
         file_buffer = io.BytesIO()
-        cropped_img.save(file_buffer, format="WEBP", exact=True)
+        cropped_img.save(file_buffer, format="WEBP", exact=True, quality=90)
         blob_name = f"{uuid.uuid4()}.webp"
 
         uri, t = upload_blob_from_memory_task(file_buffer.getvalue(), blob_name)
