@@ -172,12 +172,16 @@ class ClothesType(IntEnum):
 
 def clothes_seg_to_firebase(
     data: bytes,
-    option: list[ClothesType] | None,
+    enabled: list[ClothesType] | None,
     alpha_matting: bool = True,
     alpha_matting_erode_size: int = 12,
     post_process_mask: bool = False,
 ) -> List[ClothesImage]:
     img = Image.open(io.BytesIO(data))
+
+    width, height = img.size
+    pixel_count = width * height
+
     np_img = np.array(img.convert("RGB")
                       if img.mode == "RGBA" or img.mode == "CMYK"
                       else img)
@@ -186,26 +190,29 @@ def clothes_seg_to_firebase(
     masks = session.predict(img)
     session_pool.release(session)
 
-    width, height = img.size
-    pixel_count = width * height
+    skipped = ([False] * len(masks)
+               if enabled is None
+               else [i not in enabled
+                     for i in range(len(masks))])
 
-    enabled = [True] * len(masks) if option is None else [i in option for i in range(len(masks))]
-    zipped = zip(masks, [np.array(x) for x in masks], enabled)
+    masks_np = [None if skip
+                else (post_process(np.array(msk))
+                      if post_process_mask
+                      else np.array(msk))
+                for skip, msk in zip(skipped, masks)]
+
+    zipped = zip(masks, masks_np, skipped)
 
     payload = []
     threads = []
 
-    for mask, np_mask, enabled in zipped:
-        if not enabled:
+    for mask, np_mask, skipped in zipped:
+        if skipped:
             payload.append(None)
             continue
 
-        if post_process_mask:
-            np_mask = post_process(np_mask)
-
         opaque_pixels = np.count_nonzero(np_mask)
-        ratio = opaque_pixels / pixel_count
-        if ratio < 0.02:
+        if opaque_pixels / pixel_count < 0.02:
             payload.append(None)
             continue
 
