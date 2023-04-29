@@ -176,8 +176,17 @@ def clothes_seg_to_firebase(
     alpha_matting: bool = True,
     alpha_matting_erode_size: int = 12,
     post_process_mask: bool = False,
-) -> List[ClothesImage]:
+    resized_height_px: int = 2200,
+) -> list[ClothesImage]:
     img = Image.open(io.BytesIO(data))
+
+    resize_ratio = resized_height_px / img.height
+    if resize_ratio < 0.85:
+        img.thumbnail(
+            (resized_height_px, resized_height_px),
+            resample=Image.LANCZOS,
+            reducing_gap=2.0
+        )
 
     width, height = img.size
     pixel_count = width * height
