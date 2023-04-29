@@ -226,7 +226,7 @@ def clothes_seg_to_firebase(
         cropped_img = cutout.crop(bbox)
 
         file_buffer = io.BytesIO()
-        cropped_img.save(file_buffer, format="WEBP", exact=True, quality=90)
+        cropped_img.save(file_buffer, format="WEBP", quality=90)
         blob_name = f"{uuid.uuid4()}.webp"
 
         uri, t = upload_blob_from_memory_task(file_buffer.getvalue(), blob_name)
