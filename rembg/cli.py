@@ -9,7 +9,7 @@ import click
 import filetype
 import uvicorn
 from asyncer import asyncify
-from fastapi import Depends, FastAPI, File, Form, Query
+from fastapi import Depends, FastAPI, File, Form, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 from tqdm import tqdm
@@ -488,12 +488,13 @@ def s(port: int, log_level: str, threads: int) -> None:
         description="Remove Everything but clothes.",
     )
     async def post_index(
-        option: Annotated[list[ClothesType] | None, Query(description="Type of clothes to include")] = None,
-        file: bytes = File(
+        file: Annotated[UploadFile, File(
             default=...,
             description="Image file (byte stream) that has to be processed.",
-        ),
+        )],
+        uid: Annotated[str, Form(...)],
+        option: Annotated[list[int] | None, Query(description="Types of clothes to include")] = None,
     ):
-        return clothes_seg_to_firebase(file, option)
+        return clothes_seg_to_firebase(await file.read(), option)
 
     uvicorn.run(app, host="0.0.0.0", port=port, log_level=log_level)
