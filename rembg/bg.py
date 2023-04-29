@@ -1,6 +1,6 @@
 import io
 import uuid
-from enum import Enum
+from enum import IntEnum, Enum
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -164,14 +164,15 @@ class ClothesImage(BaseModel):
     offset_y: int
 
 
-class SegregatedClothes(BaseModel):
-    upper_body: ClothesImage = None
-    lower_body: ClothesImage = None
-    full_body: ClothesImage = None
+class ClothesType(IntEnum):
+    upper = 0
+    lower = 1
+    full = 2
 
 
 def clothes_seg_to_firebase(
     data: bytes,
+    option: list[ClothesType] | None,
     alpha_matting: bool = True,
     alpha_matting_erode_size: int = 12,
     post_process_mask: bool = False,
@@ -188,12 +189,17 @@ def clothes_seg_to_firebase(
     width, height = img.size
     pixel_count = width * height
 
-    zipped = zip(masks, [np.array(x) for x in masks])
+    enabled = [True] * len(masks) if option is None else [i in option for i in range(len(masks))]
+    zipped = zip(masks, [np.array(x) for x in masks], enabled)
 
     payload = []
     threads = []
 
-    for mask, np_mask in zipped:
+    for mask, np_mask, enabled in zipped:
+        if not enabled:
+            payload.append(None)
+            continue
+
         if post_process_mask:
             np_mask = post_process(np_mask)
 

@@ -2,7 +2,7 @@ import pathlib
 import sys
 import time
 from enum import Enum
-from typing import IO, Optional, Tuple, cast
+from typing import IO, Optional, Tuple, cast, Annotated
 
 import aiohttp
 import click
@@ -17,7 +17,7 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from . import _version
-from .bg import remove, clothes_seg_to_firebase
+from .bg import remove, clothes_seg_to_firebase, ClothesType
 from .session_base import BaseSession
 from .session_factory import new_session
 
@@ -488,11 +488,12 @@ def s(port: int, log_level: str, threads: int) -> None:
         description="Remove Everything but clothes.",
     )
     async def post_index(
+        option: Annotated[list[ClothesType] | None, Query(description="Type of clothes to include")] = None,
         file: bytes = File(
             default=...,
             description="Image file (byte stream) that has to be processed.",
         ),
     ):
-        return clothes_seg_to_firebase(file)
+        return clothes_seg_to_firebase(file, option)
 
     uvicorn.run(app, host="0.0.0.0", port=port, log_level=log_level)
