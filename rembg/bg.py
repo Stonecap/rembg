@@ -188,7 +188,7 @@ def clothes_seg_to_firebase(
         img.thumbnail(
             (resized_height_px, resized_height_px),
             resample=Image.LANCZOS,
-            reducing_gap=2.0
+            reducing_gap=3.0
         )
 
     width, height = img.size
