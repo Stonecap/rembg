@@ -251,7 +251,11 @@ def clothes_seg_to_firebase(
 
         offset_x = ((bbox[2] + bbox[0]) - width) // 2
         offset_y = ((bbox[3] + bbox[1]) - height) // 2
-        payload.append(ClothesImage(uri=uri, offset_x=offset_x, offset_y=offset_y))
+        payload.append(ClothesImage(
+            uri=uri,
+            offset_x=offset_x,
+            offset_y=offset_y)
+        )
 
     for t in threads:
         t.join()

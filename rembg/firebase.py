@@ -1,7 +1,6 @@
 import os.path
 import threading
 import time
-from typing import Tuple
 
 import firebase_admin
 from firebase_admin import credentials
@@ -14,7 +13,7 @@ firebase_admin.initialize_app(cred, {
 })
 
 
-def upload_blob_from_memory_task(contents, destination_blob_name) -> Tuple[str, threading.Thread]:
+def upload_blob_from_memory_task(contents, destination_blob_name) -> tuple[str, threading.Thread]:
     """Uploads a file to the bucket."""
 
     # The contents to upload to the file
