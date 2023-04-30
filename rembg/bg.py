@@ -161,7 +161,7 @@ def apply_background_color(img: PILImage, color: Tuple[int, int, int, int]) -> P
 class ClothesImage(BaseModel):
     id: uuid.UUID
     type: str
-    uri: str
+    path: str
     offset_x: int
     offset_y: int
 
@@ -246,13 +246,12 @@ def clothes_seg_to_firebase(
         cropped_img = cutout.crop(bbox)
 
         file_buffer = io.BytesIO()
-        cropped_img.save(file_buffer, format="WEBP", quality=90)
+        cropped_img.save(file_buffer, format="webp", quality=90)
 
         img_id = uuid.uuid4()
-        blob_path = f"{uid}/{meta.name}/{img_id}/"
-        base_img_filename, thumbnail_filename = "base.webp", "thumbnail.webp"
+        blob_path = f"{uid}/{meta.name}/{img_id}/base.webp"
 
-        uri, t_base = upload_blob_from_memory_task(file_buffer.getvalue(), blob_path + base_img_filename, "image/webp")
+        t_base = upload_blob_from_memory_task(file_buffer.getvalue(), blob_path, "image/webp")
         threads.append(t_base)
 
         offset_x = ((bbox[2] + bbox[0]) - width) // 2
@@ -260,7 +259,7 @@ def clothes_seg_to_firebase(
         payload.append(ClothesImage(
             id=img_id,
             type=meta.name,
-            uri=uri,
+            path=blob_path,
             offset_x=offset_x,
             offset_y=offset_y)
         )
