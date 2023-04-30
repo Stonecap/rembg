@@ -488,13 +488,11 @@ def s(port: int, log_level: str, threads: int) -> None:
         description="Remove Everything but clothes.",
     )
     async def post_index(
-        file: Annotated[UploadFile, File(
-            default=...,
-            description="Image file (byte stream) that has to be processed.",
-        )],
-        uid: Annotated[str, Form(...)],
-        option: Annotated[list[int] | None, Query(description="Types of clothes to include")] = None,
+        file: Annotated[UploadFile, File(description="Image file (byte stream) that has to be processed.")],
+        uid: Annotated[str, Form()],
+        smooth_edges: Annotated[bool, Form()] = False,
+        include: Annotated[list[ClothesType] | None, Query(description="Types of clothes to include")] = None,
     ):
-        return clothes_seg_to_firebase(await file.read(), option)
+        return clothes_seg_to_firebase(await file.read(), uid=uid, included=include, post_process_mask=smooth_edges)
 
     uvicorn.run(app, host="0.0.0.0", port=port, log_level=log_level)

@@ -172,10 +172,11 @@ class ClothesType(IntEnum):
 
 def clothes_seg_to_firebase(
     data: bytes,
-    enabled: list[ClothesType] | None,
+    uid: str,
+    included: list[ClothesType] | None,
+    post_process_mask: bool,
     alpha_matting: bool = True,
     alpha_matting_erode_size: int = 12,
-    post_process_mask: bool = False,
     resized_height_px: int = 2200,
 ) -> list[ClothesImage]:
     img = Image.open(io.BytesIO(data))
@@ -199,24 +200,24 @@ def clothes_seg_to_firebase(
     masks = session.predict(img)
     session_pool.release(session)
 
-    skipped = ([False] * len(masks)
-               if enabled is None
-               else [i not in enabled
-                     for i in range(len(masks))])
+    preprocessed_included = [t if included is None
+                             else (t if t in included
+                                   else None)
+                             for t in ClothesType]
 
-    masks_np = [None if skip
+    masks_np = [None if t is None
                 else (post_process(np.array(msk))
                       if post_process_mask
                       else np.array(msk))
-                for skip, msk in zip(skipped, masks)]
+                for t, msk in zip(preprocessed_included, masks)]
 
-    zipped = zip(masks, masks_np, skipped)
+    zipped = zip(masks, masks_np, preprocessed_included)
 
     payload = []
     threads = []
 
-    for mask, np_mask, skipped in zipped:
-        if skipped:
+    for mask, np_mask, meta in zipped:
+        if meta is None:
             payload.append(None)
             continue
 
