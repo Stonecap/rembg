@@ -159,7 +159,7 @@ def apply_background_color(img: PILImage, color: Tuple[int, int, int, int]) -> P
 
 
 class ClothesImage(BaseModel):
-    id: str
+    id: uuid.UUID
     type: str
     uri: str
     offset_x: int
