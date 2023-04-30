@@ -206,6 +206,7 @@ def clothes_seg_to_firebase(
                              else (t if t in included
                                    else None)
                              for t in ClothesType]
+    preprocessed_included = preprocessed_included[:len(masks)]
 
     masks_np = [None if t is None
                 else (post_process(np.array(msk))
