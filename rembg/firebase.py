@@ -13,7 +13,7 @@ firebase_admin.initialize_app(cred, {
 })
 
 
-def upload_blob_from_memory_task(contents, destination_blob_name) -> tuple[str, threading.Thread]:
+def upload_blob_from_memory_task(contents, destination_blob_name, mime_type) -> tuple[str, threading.Thread]:
     """Uploads a file to the bucket."""
 
     # The contents to upload to the file
@@ -24,7 +24,7 @@ def upload_blob_from_memory_task(contents, destination_blob_name) -> tuple[str, 
 
     bucket = storage.bucket()
     blob = bucket.blob(destination_blob_name)
-    thread = threading.Thread(target=blob.upload_from_string, args=(contents, "image/webp"))
+    thread = threading.Thread(target=blob.upload_from_string, args=(contents, mime_type))
     thread.start()
 
     expire_epoch = int(time.time()) + 3600
