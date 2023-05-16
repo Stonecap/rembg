@@ -28,7 +28,7 @@ from .firebase import upload_blob_from_memory_task
 
 kernel = getStructuringElement(MORPH_ELLIPSE, (3, 3))
 
-session_pool = ObjectPool(factory_method=new_session, param="u2net_cloth_seg", max_size=8)
+session_pool = ObjectPool(factory_method=new_session, param="u2net_cloth_seg", max_size=4)
 
 
 class ReturnType(Enum):

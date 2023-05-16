@@ -11,4 +11,4 @@ RUN wget https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net_clo
 
 EXPOSE 5000
 ENTRYPOINT [ "rembg" ]E
-CMD ["s"]
+CMD ["s", "-t", "4"]

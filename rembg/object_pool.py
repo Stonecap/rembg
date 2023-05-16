@@ -1,4 +1,6 @@
 import queue
+
+
 class ObjectPool:
     def __init__(self, factory_method, param, max_size=10):
         self.factory_method = factory_method
