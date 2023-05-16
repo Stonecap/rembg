@@ -5,7 +5,10 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import storage
 
-key_path = os.path.join(os.getcwd(), 'wardrobeServiceAccoutKey.json')
+key_path = "/run/secrets/firebaseAdminKey.json"
+if not os.path.exists(key_path):
+    key_path = os.path.join(os.getcwd(), 'wardrobeServiceAccoutKey.json')
+
 cred = credentials.Certificate(key_path)
 firebase_admin.initialize_app(cred, {
     'storageBucket': 'capstone-wardrobe.appspot.com'
