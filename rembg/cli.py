@@ -11,7 +11,7 @@ from watchdog.observers import Observer
 
 from . import _version
 from .bg import remove
-from .server import start_server
+from main import start_server
 from .session_factory import new_session
 
 

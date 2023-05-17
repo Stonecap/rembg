@@ -6,12 +6,11 @@ import uvicorn
 from asyncer import asyncify
 from fastapi import Depends, FastAPI, File, Form, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import Response
+from fastapi.openapi.models import Response
 
-from . import _version
-from .bg import remove, clothes_seg_to_firebase, ClothesType
-from .session_base import BaseSession
-from .session_factory import new_session
+from rembg.bg import remove, clothes_seg_to_firebase, ClothesType
+from rembg.session_base import BaseSession
+from rembg.session_factory import new_session
 
 sessions: dict[str, BaseSession] = {}
 tags_metadata = [
@@ -27,7 +26,6 @@ tags_metadata = [
 app = FastAPI(
     title="Rembg",
     description="Rembg is a tool to remove images background. That is it.",
-    version=_version.get_versions()["version"],
     contact={
         "name": "Daniel Gatis",
         "url": "https://github.com/danielgatis",
@@ -50,7 +48,7 @@ app.add_middleware(
 
 
 def start_server(port: int, log_level: str, threads: int) -> None:
-    uvicorn.run("rembg.server:app", host="0.0.0.0", port=port, workers=threads, log_level=log_level)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, workers=threads, log_level=log_level)
 
 
 class ModelType(str, Enum):
