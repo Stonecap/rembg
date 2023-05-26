@@ -20,15 +20,12 @@ from pymatting.foreground.estimate_foreground_ml import estimate_foreground_ml
 from pymatting.util.util import stack_images
 from scipy.ndimage import binary_erosion
 
-from .object_pool import ObjectPool
 from .session_base import BaseSession
 from .session_factory import new_session
 
 from .firebase import upload_blob_from_memory_task
 
 kernel = getStructuringElement(MORPH_ELLIPSE, (3, 3))
-
-session_pool = ObjectPool(factory_method=new_session, param="u2net_cloth_seg", max_size=4)
 
 
 class ReturnType(Enum):
@@ -198,9 +195,9 @@ def clothes_seg_to_firebase(
                       if img.mode == "RGBA" or img.mode == "CMYK"
                       else img)
 
-    session = session_pool.acquire()
+    session = new_session("u2net_cloth_seg")
     masks = session.predict(img)
-    session_pool.release(session)
+    del session
 
     preprocessed_included = [t if included is None
                              else (t if t in included
